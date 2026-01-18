@@ -11,6 +11,7 @@ import pandas as pd
 sys.path.append(str(Path(__file__).parent))
 
 from src.data.collector import FootballDataCollector
+from src.data.csv_collector import FootballDataCSVCollector
 from src.data.preprocessor import DataPreprocessor
 from src.features.engineer import FeatureEngineer
 from src.models.xgboost_model import XGBoostModel
@@ -20,6 +21,44 @@ from src.prediction.predictor import MatchPredictor
 from src.prediction.odds_analyzer import OddsAnalyzer
 from src.evaluation.backtester import Backtester
 import config
+
+
+def collect_csv_data(args):
+    """Collect historical match data from football-data.co.uk CSV files (FREE)"""
+    print("\n" + "="*80)
+    print("COLLECTING HISTORICAL DATA FROM CSV FILES")
+    print("="*80 + "\n")
+    
+    collector = FootballDataCSVCollector()
+    
+    # Parse leagues
+    league_map = {
+        "PL": "E0", "Championship": "E1",
+        "LaLiga": "SP1", "SerieA": "I1",
+        "Bundesliga": "D1", "Ligue1": "F1"
+    }
+    
+    leagues_input = args.leagues.split(",") if args.leagues else ["PL"]
+    league_codes = [league_map.get(l, l) for l in leagues_input]
+    
+    # Parse seasons (e.g., 1819 for 2018/19)
+    start_season = int(args.start_season) if args.start_season else 1819
+    end_season = int(args.end_season) if args.end_season else 2324
+    
+    print(f"Leagues: {', '.join(leagues_input)}")
+    print(f"Seasons: {start_season} to {end_season}\n")
+    
+    # Collect data
+    df = collector.collect_multiple_seasons(league_codes, start_season, end_season)
+    
+    if df.empty:
+        print("No data collected!")
+        return
+    
+    # Save data
+    collector.save_data(df)
+    
+    print(f"\nSuccessfully collected {len(df)} matches!")
 
 
 def collect_data(args):
@@ -56,9 +95,22 @@ def train_models(args):
     print("TRAINING MODELS")
     print("="*80 + "\n")
     
-    # Load data
-    collector = FootballDataCollector()
-    df = collector.load_data()
+    # Load data - try historical CSV first, then API data
+    csv_collector = FootballDataCSVCollector()
+    df = csv_collector.load_data()
+    
+    if df.empty:
+        print("No historical CSV data found, trying API data...")
+        api_collector = FootballDataCollector()
+        df = api_collector.load_data()
+    
+    if df.empty:
+        print("No data found! Please run --collect-csv or --collect first.")
+        return
+    
+    print(f"Loaded {len(df)} matches")
+    data_source = "CSV historical data" if not df.empty else "API data"
+    print(f"Using: {data_source}\n")
     
     if df.empty:
         print("No data found! Please run --collect first.")
@@ -271,8 +323,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Collect data for Premier League
-  python main.py --collect --leagues PL --seasons 2021,2022,2023
+  # Collect historical CSV data (RECOMMENDED - more data, free)
+  python main.py --collect-csv --leagues PL --start-season 1819 --end-season 2324
+  
+  # Collect data from API (limited to current season with free tier)
+  python main.py --collect --leagues PL --seasons 2023
   
   # Train models
   python main.py --train
@@ -286,14 +341,23 @@ Examples:
     )
     
     # Main actions
-    parser.add_argument("--collect", action="store_true", help="Collect historical data")
+    parser.add_argument("--collect-csv", action="store_true", 
+                       help="Collect historical CSV data from football-data.co.uk (FREE, RECOMMENDED)")
+    parser.add_argument("--collect", action="store_true", 
+                       help="Collect data from Football-Data.org API (requires API key)")
     parser.add_argument("--train", action="store_true", help="Train prediction models")
     parser.add_argument("--predict", action="store_true", help="Predict upcoming matches")
     parser.add_argument("--backtest", action="store_true", help="Run backtest on historical data")
     
     # Options
-    parser.add_argument("--leagues", type=str, help="Comma-separated league codes (e.g., PL,PD,SA)")
-    parser.add_argument("--seasons", type=str, help="Comma-separated season years (e.g., 2021,2022,2023)")
+    parser.add_argument("--leagues", type=str, 
+                       help="Comma-separated league codes (e.g., PL,LaLiga,SerieA)")
+    parser.add_argument("--seasons", type=str, 
+                       help="Comma-separated season years for API (e.g., 2021,2022,2023)")
+    parser.add_argument("--start-season", type=str, 
+                       help="Start season for CSV collection (e.g., 1819 for 2018/19)")
+    parser.add_argument("--end-season", type=str, 
+                       help="End season for CSV collection (e.g., 2324 for 2023/24)")
     parser.add_argument("--days", type=int, help="Days ahead for upcoming matches (default: 7)")
     parser.add_argument("--start-date", type=str, help="Backtest start date (YYYY-MM-DD)")
     parser.add_argument("--end-date", type=str, help="Backtest end date (YYYY-MM-DD)")
@@ -301,6 +365,9 @@ Examples:
     args = parser.parse_args()
     
     # Execute actions
+    if args.collect_csv:
+        collect_csv_data(args)
+    
     if args.collect:
         collect_data(args)
     
@@ -313,7 +380,7 @@ Examples:
     if args.backtest:
         run_backtest(args)
     
-    if not any([args.collect, args.train, args.predict, args.backtest]):
+    if not any([args.collect_csv, args.collect, args.train, args.predict, args.backtest]):
         parser.print_help()
 
 
