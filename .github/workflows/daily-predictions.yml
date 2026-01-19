@@ -44,7 +44,7 @@ jobs:
           echo "PYTHONPATH is: $PYTHONPATH"
           echo "Working directory is: $(pwd)"
           ls -la src/data/
-          python main.py --predict --odds --leagues PL --days 7
+          python main.py --predict --odds --leagues SA --days 7
       
       - name: Generate HTML page
         run: |
@@ -53,6 +53,6 @@ jobs:
       - name: Commit and push if changes
         run: |
           git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action Bot"
+          git config --local user.name "mine"
           git add index.html data/value_bets_*.csv
           git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 Auto-update predictions $(date +%Y-%m-%d)" && git push)
