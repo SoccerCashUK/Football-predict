@@ -12,8 +12,9 @@ ENV/
 .env
 
 # Data files (but not src/data source code)
-/data/
-*.csv
+/data/*
+!data/value_bets_*.csv
+!data/football_matches_historical.csv
 *.db
 *.sqlite
 
