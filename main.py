@@ -4,11 +4,16 @@ Orchestrates data collection, model training, prediction, and backtesting
 """
 import argparse
 import sys
+import os
 from pathlib import Path
 import pandas as pd
 
-# Add src to path
-sys.path.append(str(Path(__file__).parent))
+# Add src to path - try multiple approaches for compatibility
+script_dir = Path(__file__).parent.resolve()
+sys.path.insert(0, str(script_dir))
+
+# Also set PYTHONPATH environment variable
+os.environ['PYTHONPATH'] = str(script_dir) + os.pathsep + os.environ.get('PYTHONPATH', '')
 
 from src.data.collector import FootballDataCollector
 from src.data.csv_collector import FootballDataCSVCollector
