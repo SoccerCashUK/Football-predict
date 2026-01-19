@@ -11,14 +11,14 @@ ENV/
 # Environment variables
 .env
 
-# Data files
-data/
+# Data files (but not src/data source code)
+/data/
 *.csv
 *.db
 *.sqlite
 
-# Model files
-models/
+# Model files (but not src/models source code)
+/models/
 *.pkl
 *.h5
 *.joblib
